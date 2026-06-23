@@ -1,9 +1,6 @@
 package smartcrop
 
-import kotlin.math.abs
-import kotlin.math.maxOf
-import kotlin.math.minOf
-import kotlin.math.sqrt
+import kotlin.math.*
 
 /**
  * smartcrop.js — Kotlin port
@@ -127,13 +124,11 @@ object SmartCrop {
         var prescale = 1.0
 
         if (opts.width > 0 && opts.height > 0) {
-            val scale = minOf(
-                image.width.toDouble() / opts.width,
-                image.height.toDouble() / opts.height
-            )
+            val scale = (image.width.toDouble() / opts.width)
+                .coerceAtMost(image.height.toDouble() / opts.height)
             val cropWidth = (opts.width * scale).toInt()
             val cropHeight = (opts.height * scale).toInt()
-            val minScale = minOf(opts.maxScale, maxOf(1.0 / scale, opts.minScale))
+            val minScale = opts.maxScale.coerceAtMost((1.0 / scale).coerceAtLeast(opts.minScale))
             opts = opts.copy(
                 cropWidth = cropWidth,
                 cropHeight = cropHeight,
@@ -141,10 +136,9 @@ object SmartCrop {
             )
 
             // prescale to speed up analysis on large images
-            prescale = minOf(
-                maxOf(256.0 / image.width, 256.0 / image.height),
-                1.0
-            )
+            prescale = (256.0 / image.width)
+                .coerceAtLeast(256.0 / image.height)
+                .coerceAtMost(1.0)
             if (prescale < 1.0) {
                 image = prescaleImage(image, prescale)
                 opts = opts.copy(
@@ -385,7 +379,7 @@ private fun applyBoost(boost: CropBoost, output: ImgData) {
 
 private fun generateCrops(options: Options, width: Int, height: Int): List<InternalCrop> {
     val results = mutableListOf<InternalCrop>()
-    val minDimension = minOf(width, height)
+    val minDimension = width.coerceAtMost(height)
     val cropWidth = if (options.cropWidth > 0) options.cropWidth.toDouble() else minDimension.toDouble()
     val cropHeight = if (options.cropHeight > 0) options.cropHeight.toDouble() else minDimension.toDouble()
 
@@ -469,8 +463,8 @@ private fun importance(options: Options, crop: InternalCrop, x: Int, y: Int): Do
     val py = abs(0.5 - ny) * 2.0
 
     // distance from edge penalty
-    val dx = maxOf(px - 1.0 + options.edgeRadius, 0.0)
-    val dy = maxOf(py - 1.0 + options.edgeRadius, 0.0)
+    val dx = (px - 1.0 + options.edgeRadius).coerceAtLeast(0.0)
+    val dy = (py - 1.0 + options.edgeRadius).coerceAtLeast(0.0)
     val d = (dx * dx + dy * dy) * options.edgeWeight
 
     // centre preference
@@ -478,7 +472,7 @@ private fun importance(options: Options, crop: InternalCrop, x: Int, y: Int): Do
 
     // rule-of-thirds bonus
     if (options.ruleOfThirds) {
-        s += maxOf(s + d + 0.5, 0.0) * 1.2 * (thirds(px) + thirds(py))
+        s += (s + d + 0.5).coerceAtLeast(0.0) * 1.2 * (thirds(px) + thirds(py))
     }
 
     return s + d
@@ -514,8 +508,8 @@ private fun downSample(input: ImgData, factor: Int): ImgData {
                     g += idata[j + 1].toDouble()
                     b += idata[j + 2].toDouble()
                     a += idata[j + 3].toDouble()
-                    mr = maxOf(mr, idata[j])
-                    mg = maxOf(mg, idata[j + 1])
+                    mr = mr.coerceAtLeast(idata[j])
+                    mg = mg.coerceAtLeast(idata[j + 1])
                 }
             }
 
@@ -554,8 +548,8 @@ private fun saturation(r: Int, g: Int, b: Int): Double {
     val rf = r.toDouble() / 255.0
     val gf = g.toDouble() / 255.0
     val bf = b.toDouble() / 255.0
-    val maximum = maxOf(rf, gf, bf)
-    val minimum = minOf(rf, gf, bf)
+    val maximum = rf.coerceAtLeast(gf).coerceAtLeast(bf)
+    val minimum = rf.coerceAtMost(gf).coerceAtMost(bf)
     if (maximum == minimum) return 0.0
     val l = (maximum + minimum) / 2.0
     val d = maximum - minimum
@@ -564,7 +558,7 @@ private fun saturation(r: Int, g: Int, b: Int): Double {
 
 private fun thirds(x: Double): Double {
     val t = (((x - 1.0 / 3.0 + 1.0) % 2.0) * 0.5 - 0.5) * 16.0
-    return maxOf(1.0 - t * t, 0.0)
+    return (1.0 - t * t).coerceAtLeast(0.0)
 }
 
 private fun prescaleImage(image: ImgData, scale: Double): ImgData {
