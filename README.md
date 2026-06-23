@@ -1,248 +1,159 @@
-# smartcrop.js
+# smartcrop.kt
 
 ![example workflow](https://github.com/jwagner/smartcrop.js/actions/workflows/tests.yml/badge.svg)
 
-Smartcrop.js implements an algorithm to find good crops for images.
-It can be used in the browser, in node or via a CLI.
+Kotlin port of [smartcrop.js](https://github.com/jwagner/smartcrop.js) — content-aware image cropping.
+
+Finds the most visually important region of an image using edge detection, skin-tone analysis, saturation, and rule-of-thirds composition scoring.
 
 ![Example](https://29a.ch/sandbox/2014/smartcrop/example.jpg)
 Image: [https://www.flickr.com/photos/endogamia/5682480447/](https://www.flickr.com/photos/endogamia/5682480447) by Leon F. Cabeiro (N. Feans), licensed under CC-BY-2.0
 
-> **Note**
-> I'm currently working on a more advanced version of smartcrop.js based on machine learning. As part of that I'm looking for a large dataset of manually cropped images. If you know of such a dataset, please [let me know](https://29a.ch/about).
+## Usage
 
-## Demos
+```kotlin
+import smartcrop.*
 
-- [Smartcrop.js Test Suite](https://29a.ch/sandbox/2014/smartcrop/examples/testsuite.html), contains over 100 images, **heavy**.
-- [Smartcrop.js Test Bed](https://29a.ch/sandbox/2014/smartcrop/examples/testbed.html), allows you to test smartcrop with your own images and different face detection libraries.
-- [Automatic Photo transitions](https://29a.ch/sandbox/2014/smartcrop/examples/slideshow.html), automatically creates Ken Burns transitions for a slide show.
+val input = ImgData(width, height, pixelData)
+val result = SmartCrop.crop(input, Options(width = 200, height = 200))
 
-## Simple Example
-
-```javascript
-// you pass in an image as well as the width & height of the crop you
-// want to optimize.
-smartcrop.crop(image, { width: 100, height: 100 }).then(function(result) {
-  console.log(result);
-});
+val crop = result.topCrop
+// crop.x, crop.y, crop.width, crop.height
 ```
 
-Output:
-
-```javascript
-// smartcrop will output you its best guess for a crop
-// you can now use this data to crop the image.
-{topCrop: {x: 300, y: 200, height: 200, width: 200}}
+**Output:**
+```kotlin
+Crop(x=300, y=200, width=200, height=200, score=Score(...))
 ```
 
-## Download/ Installation
+The library operates on raw RGBA pixel data (`IntArray` with values 0–255). No platform dependencies — works on JVM, Android, Native, or JS via Kotlin Multiplatform.
 
-`npm install smartcrop`
-or just download [smartcrop.js](https://raw.githubusercontent.com/jwagner/smartcrop.js/master/smartcrop.js) from the git repository.
+## Installation
 
-Smarcrop requires support for [Promises](http://caniuse.com/#feat=promises),
-use a [polyfill](https://github.com/taylorhakes/promise-polyfill) for unsupported browsers or set `smartcrop.Promise` to your favorite promise implementation
-(I recommend [bluebird](http://bluebirdjs.com/)).
+### Gradle
 
+```kotlin
+repositories {
+    mavenCentral()
+}
 
-## Consider avoiding crops using dont-crop
+dependencies {
+    implementation("com.github.jwagner:smartcrop:2.0.5")
+}
+```
 
-If you are interested in using smartcrop.js to crop your images you should also consider to avoid cropping them by using [dont-crop](https://github.com/jwagner/dont-crop/).
-Dont-crop gives you matching gradients and colors to pad and complement your images.
+### Maven
 
-![Example](https://29a.ch/images/dont-crop.cache-399897619c3de2e0.jpg)
-
-## Command Line Interface
-
-The [smartcrop-cli](https://github.com/jwagner/smartcrop-cli) offers command line interface to smartcrop.js.
-
-## Node
-
-You can use smartcrop from nodejs via either [smartcrop-gm](https://github.com/jwagner/smartcrop-gm) (which is using image magick via gm) or [smartcrop-sharp](https://github.com/jwagner/smartcrop-sharp) (which is using libvips via sharp).
-The [smartcrop-cli](https://github.com/jwagner/smartcrop-cli) can be used as an example of using smartcrop from node.
-
-## Stability
-
-While _smartcrop.js_ is a small personal project it is currently being used on high traffic production sites.
-It has a basic set of automated tests and a test coverage of close to 100%.
-The tests run in all modern browsers thanks to [saucelabs](https://saucelabs.com/).
-If in any doubt the code is short enough to perform a quick review yourself.
+```xml
+<dependency>
+    <groupId>com.github.jwagner</groupId>
+    <artifactId>smartcrop</artifactId>
+    <version>2.0.5</version>
+</dependency>
+```
 
 ## Algorithm Overview
 
-Smartcrop.js works using fairly dumb image processing. In short:
-
-1. Find edges using laplace
-1. Find regions with a color like skin
+1. Find edges using a Laplacian filter
+1. Find regions with skin-like color
 1. Find regions high in saturation
-1. Boost regions as specified by options (for example detected faces)
+1. Boost regions as specified by options (e.g. detected faces)
 1. Generate a set of candidate crops using a sliding window
-1. Rank them using an importance function to focus the detail in the center
-   and avoid it in the edges.
-1. Output the candidate crop with the highest rank
+1. Rank them using an importance function that centres detail and penalises edges
+1. Return the highest-ranked crop
 
-## Face detection
+## Face Detection
 
-The smartcrop algorithm itself is designed to be simple, relatively fast, small and generic.
+Smartcrop's base algorithm is simple, fast, and generic. For better results on portraits, combine it with a face detector to create boost regions.
 
-In many cases it does make sense to add face detection to it to ensure faces get the priority they deserve.
+Example with Android's `CameraX` or ML Kit:
 
-There are multiple javascript libraries which can be easily integrated into smartcrop.js.
-
-- [ccv js](https://github.com/liuliu/ccv) / [jquery.facedetection](http://facedetection.jaysalvat.com/)
-- [tracking.js](https://trackingjs.com/examples/face_hello_world.html)
-- [opencv.js](https://docs.opencv.org/3.3.1/d5/d10/tutorial_js_root.html)
-- [node-opencv](https://github.com/peterbraden/node-opencv)
-
-You can experiment with all of these in the [smartcrop.js testbed](https://29a.ch/sandbox/2014/smartcrop/examples/testbed.html)
-
-On the client side I would recommend using tracking.js because it's small and simple. Opencv.js is compiled from c++ and very heavy (~7.6MB of javascript + 900kb of data).
-jquery.facedetection has dependency on jquery and from my limited experience seems to perform worse than the others.
-
-On the server side node-opencv can be quicker but comes with some [annoying issues](https://github.com/peterbraden/node-opencv/issues/415) as well.
-
-It's also worth noting that all of these libraries are based on the now dated [viola-jones](https://en.wikipedia.org/wiki/Viola%E2%80%93Jones_object_detection_framework) object detection framework.
-It would be interesting to see how more [state of the art](http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/WiderFace_Results.html) techniques could be implemented in browser friendly javascript.
-
-## Supported Module Formats
-
-- CommonJS
-- AMD
-- global export / window
-
-## Supported Browsers
-
-See [caniuse.com/canvas](http://caniuse.com/canvas).
-A [polyfill](https://github.com/taylorhakes/promise-polyfill) for
-[Promises](http://caniuse.com/#feat=promises) is recommended if you need to support old browsers.
+```kotlin
+val boost = detectedFaces.map { face ->
+    CropBoost(
+        x = face.boundingBox.left,
+        y = face.boundingBox.top,
+        width = face.boundingBox.width(),
+        height = face.boundingBox.height(),
+        weight = 1.0
+    )
+}
+val result = SmartCrop.crop(input, Options(width = 200, height = 200, boost = boost))
+```
 
 ## API
 
-### smartcrop.crop(image, options)
+### `SmartCrop.crop(input, options)`
 
-Find the best crop for _image_ using _options_.
+Finds the best crop for `input` using `options`.
 
-**image:** anything ctx.drawImage() accepts, usually HTMLImageElement, HTMLCanvasElement or HTMLVideoElement.
+**`input: ImgData`** — RGBA pixel data. Width, height, and an `IntArray` of packed RGBA byte values (0–255 per channel, row-major order).
 
-Keep in mind that [origin policies](https://en.wikipedia.org/wiki/Same-origin_policy) apply to the image source.
-You may not use cross-domain images without [CORS](https://en.wikipedia.org/wiki/Cross-origin_resource_sharing) clearance.
+**`options: Options`** — see [Options](#options).
 
-**options:** [cropOptions](#cropOptions)
+**returns:** [`CropResult`](#cropresult).
 
-**returns:** A promise for a [cropResult](#cropResult).
+### Options
 
-### cropOptions
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `width` | `Int` | `0` | Desired crop width |
+| `height` | `Int` | `0` | Desired crop height |
+| `aspect` | `Double` | `0.0` | Set width = aspect, height = 1 (alternative to width/height) |
+| `minScale` | `Double` | `1.0` | Smallest allowed crop scale; `1.0` prevents upscaling |
+| `maxScale` | `Double` | `1.0` | Largest allowed crop scale |
+| `scaleStep` | `Double` | `0.1` | Step between scale iterations |
+| `step` | `Int` | `8` | Pixel step between crop candidates |
+| `boost` | `List<CropBoost>?` | `null` | Regions to boost (e.g. faces). See [CropBoost](#cropboost) |
+| `ruleOfThirds` | `Boolean` | `true` | Enable rule-of-thirds composition weighting |
+| `detailWeight` | `Double` | `0.2` | Importance of edge detail in scoring |
+| `skinWeight` | `Double` | `1.8` | Importance of skin tones in scoring |
+| `saturationWeight` | `Double` | `0.1` | Importance of saturated regions in scoring |
+| `edgeWeight` | `Double` | `-20.0` | Penalty for cropping near edges |
+| `outsideImportance` | `Double` | `-0.5` | Importance weight for areas outside the crop |
+| `boostWeight` | `Double` | `100.0` | Multiplier for boosted regions |
+| `debug` | `Boolean` | `false` | Include full candidate list and intermediate buffers in result |
 
-**minScale:** minimal scale of the crop rect, set to 1.0 to prevent smaller than necessary crops (lowers the risk of chopping things off).
+For the full list of internal tuning parameters, see `Options` in [SmartCrop.kt](src/main/kotlin/smartcrop/SmartCrop.kt).
 
-**width:** width of the crop you want to use.
+### CropResult
 
-**height:** height of the crop you want to use.
-
-**boost:** optional array of regions whose 'interestingness' you want to boost (for example faces). See [boost](#boost);
-
-**ruleOfThirds:** optional boolean if set to false it will turn off the rule of thirds composition weight.
-
-**debug _(internal)_:** if true, cropResults will contain a debugCanvas and the complete results array.
-
-There are many more (for now undocumented) options available.
-Check the [source](smartcrop.js#L32) and be advised that they might change in the future.
-
-### cropResult
-
-Result of the promise returned by smartcrop.crop.
-
-```javascript
-{
-  topCrop: crop;
-}
+```kotlin
+CropResult(
+    topCrop = Crop(x, y, width, height, score),
+    crops = [...]?,       // all candidates (only when debug = true)
+    debugOutput = ...?,    // analysis buffer (debug only)
+    debugOptions = ...?,   // options snapshot (debug only)
+    debugTopCrop = ...?    // unscaled copy of topCrop (debug only)
+)
 ```
 
-### crop
+### CropBoost
 
-An individual crop.
-
-```javascript
-{
-  x: 11, // pixels from the left side
-  y: 20, // pixels from the top
-  width: 1, // pixels
-  height: 1 // pixels
-}
+```kotlin
+CropBoost(
+    x = 11,
+    y = 20,
+    width = 32,
+    height = 32,
+    weight = 1.0  // [0, 1]
+)
 ```
 
-### boost
+Impact is proportional to weight × area.
 
-Describes a region to boost. A usage example of this is to take
-into account faces in the image. See [smartcrop-cli](https://github.com/jwagner/smartcrop-cli) for an example on how to integrate face detection.
+## Performance
 
-```javascript
-{
-  x: 11, // pixels from the left side
-  y: 20, // pixels from the top
-  width: 32, // pixels
-  height: 32, // pixels
-  weight: 1 // in the range [0, 1]
-}
-```
-
-Note that the impact the boost has is proportional to it's weight and area.
+The analysis handles most images in <20 ms on a modern JVM/Android device. Large images are automatically prescaled before analysis.
 
 ## Tests
 
-You can run the tests using `grunt test`. Alternatively you can also just run grunt (the default task) and open <http://localhost:8000/test/.>
-
-## Benchmark
-
-There are benchmarks for both the browser (test/benchmark.html) and node (node test/benchmark-node.js [requires node-canvas])
-both powered by [benchmark.js](http://benchmarkjs.com).
-
-If you just want some rough numbers: It takes **< 20 ms** to find a **square crop** of a **640x427px** picture on an i7.
-In other words, it's fine to run it on one image, it's suboptimal to run it on an entire gallery on page load.
-
-## Contributors
-
-- [Christian Muehlhaeuser](https://github.com/muesli)
-
-## Ports, Alternatives
-
-- [connect-thumbs](https://github.com/inadarei/connect-thumbs) Middleware for connect.js that supports smartcrop.js by [Irakli Nadareishvili](https://github.com/inadarei/connect-thumbs)
-- [smartcrop-java](https://github.com/QuadFlask/smartcrop-java) by [QuadFlask](https://github.com/QuadFlask/)
-- [smartcrop-android](https://github.com/QuadFlask/smartcrop-android) by [QuadFlask](https://github.com/QuadFlask/)
-- [smartcrop.go](https://github.com/muesli/smartcrop) by [Christian Muehlhaeuser](https://github.com/muesli)
-- [smartcrop.py](https://github.com/hhatto/smartcrop.py) by [Hideo Hattori](http://www.hexacosa.net/about/)
-- [smartcrop-rails](https://github.com/sadiqmmm/smartcrop-rails) smartcrop wrapped in a ruby gem by [Mohammed Sadiq](https://github.com/sadiqmmm/)
-- [smartcrop.net](https://github.com/softawaregmbh/smartcrop.net) c# .net port by [softaware gmbh](https://www.softaware.at/)
-- [dont-crop](https://github.com/jwagner/dont-crop/) a library to avoid cropping by padding images with matching colors or gradients
-
-## Version history
-
-### 2.0.5
-Fix `TS1046: Top-level declarations in .d.ts files must start with either a 'declare' or 'export' modifier.`.
-
-### 2.0.4
-Typescript type definitions.
-
-### 2.0.2
-
-In short: It's a lot faster when calculating bigger crops.
-The quality of the crops should be comparable but the results
-are going to be different so this will be a major release.
-
-### 1.1.1
-
-Removed useless files from npm package.
-
-### 1.1
-
-Creating github releases. Added options.input which is getting passed along to iop.open.
-
-### 1.0
-
-Refactoring/cleanup to make it easier to use with node.js (dropping the node-canvas dependency) and enable support for boosts which can be used to do face detection.
-This is a 1.0 in the semantic meaning (denoting backwards incompatible API changes).
-It does not denote a finished product.
+```bash
+./gradlew test
+```
 
 ## License
 
-Copyright (c) 2018 Jonas Wagner, licensed under the MIT License (enclosed)
+Copyright (c) 2018 Jonas Wagner — MIT License (enclosed)
+
+Kotlin port by the smartcrop community.
